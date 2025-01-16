@@ -8,25 +8,17 @@
 #define NUM_BODIES 10 // Number of celestial bodies
 #define NUM_STEPS 1000000 // Number of time steps
 
-// Structure to store the position and velocity of a celestial body
-typedef struct 
-{
+typedef struct {
     double mass;
     double position[3];
     double velocity[3];
 } Body;
 
-// Function to compute the gravitational acceleration on a body due to another body
 void compute_acceleration(Body *body1, Body *body2, double acceleration[3]) {
-    // Computing the x differential webetwwen the two different bodies
     double dx = body2->position[0] - body1->position[0];
-    // Computing the y differential webetwwen the two different bodies
     double dy = body2->position[1] - body1->position[1];
-    // Computing the z differential webetwwen the two different bodies
     double dz = body2->position[2] - body1->position[2];
-    // Computing the distance between the two different bodies
     double distance = sqrt(dx * dx + dy * dy + dz * dz);
-    // Computing the magnitude of the gravitational force between the two different bodies
     double magnitude = (G * body2->mass) / (distance * distance + 1e-10);
 
     acceleration[0] = magnitude * dx / distance;
@@ -34,52 +26,32 @@ void compute_acceleration(Body *body1, Body *body2, double acceleration[3]) {
     acceleration[2] = magnitude * dz / distance;
 }
 
-// Runge-Kutta 4th order integration for position and velocity
 void runge_kutta_step(Body *body, double net_acceleration[3]) {
-    // Declaring the variables for the Runge-Kutta 4th order integration
     double k1v[3], k1x[3];
     double k2v[3], k2x[3];
     double k3v[3], k3x[3];
     double k4v[3], k4x[3];
 
-    // Computing the Runge-Kutta 4th order integration
-    // Computing the k1v and k1x (1st order)
     for (int i = 0; i < 3; i++) {
         k1v[i] = net_acceleration[i] * DT;
         k1x[i] = body->velocity[i] * DT;
-    }
-
-    // Computing the k2v and k2x (2nd order)
-    for (int i = 0; i < 3; i++) {
         k2v[i] = net_acceleration[i] * DT;
         k2x[i] = (body->velocity[i] + 0.5 * k1v[i]) * DT;
-    }
-
-    // Computing the k3v and k3x (3rd order)
-    for (int i = 0; i < 3; i++) {
         k3v[i] = net_acceleration[i] * DT;
         k3x[i] = (body->velocity[i] + 0.5 * k2v[i]) * DT;
-    }
-
-    // Computing the k4v and k4x (4th order)
-    for (int i = 0; i < 3; i++) {
         k4v[i] = net_acceleration[i] * DT;
         k4x[i] = (body->velocity[i] + k3v[i]) * DT;
     }
 
-    // Updating the position and velocity of the body
     for (int i = 0; i < 3; i++) {
         body->velocity[i] += (k1v[i] + 2 * k2v[i] + 2 * k3v[i] + k4v[i]) / 6;
         body->position[i] += (k1x[i] + 2 * k2x[i] + 2 * k3x[i] + k4x[i]) / 6;
     }
 }
 
-// Serial implementation of the n-body simulation
 void update_bodies(Body bodies[NUM_BODIES]) {
-    // Declaring the net acceleration for each body by initializing it to 0
     double net_acceleration[NUM_BODIES][3] = {0};
 
-    // Compute net acceleration for each body
     for (int i = 0; i < NUM_BODIES; i++) {
         for (int j = 0; j < NUM_BODIES; j++) {
             if (i != j) {
@@ -92,28 +64,21 @@ void update_bodies(Body bodies[NUM_BODIES]) {
         }
     }
 
-    // Apply Runge-Kutta integration for each body
     for (int i = 0; i < NUM_BODIES; i++) {
         runge_kutta_step(&bodies[i], net_acceleration[i]);
     }
 }
 
-// Print bodies
-void print_bodies(Body bodies[NUM_BODIES], int step) {
-    printf("Step %d:\n", step);
+void plot_bodies(FILE *gnuplot, Body bodies[NUM_BODIES]) {
+    fprintf(gnuplot, "plot '-' with points pt 7 ps 1 title 'Bodies'\n");
     for (int i = 0; i < NUM_BODIES; i++) {
-        printf("Body %d: Position = (%.2e, %.2e, %.2e), Velocity = (%.2e, %.2e, %.2e)\n",
-               i,
-               bodies[i].position[0], bodies[i].position[1], bodies[i].position[2],
-               bodies[i].velocity[0], bodies[i].velocity[1], bodies[i].velocity[2]);
+        fprintf(gnuplot, "%.2e %.2e\n", bodies[i].position[0], bodies[i].position[1]);
     }
-    printf("\n");
+    fprintf(gnuplot, "e\n");
+    fflush(gnuplot);
 }
 
 int main() {
-    // Initialize bodies
-    // First column is mass, second column is position (x, y, z), third column is velocity (vel_x, vel_y, vel_z)
-    // Mass is in kg, position is in meters, velocity is in meters per second
     Body bodies[NUM_BODIES] = {
         {1.989e30, {0, 0, 0}, {0, 0, 0}},            // Sun
         {3.301e23, {5.791e10, 0, 0}, {0, 47400, 0}}, // Mercury
@@ -128,19 +93,29 @@ int main() {
     };
 
     struct timeval start, end;
-    // Measure start time
     gettimeofday(&start, NULL);
 
-    // Run simulation
-    for (int step = 0; step < NUM_STEPS; step++) {
-        update_bodies(bodies);
-        //print_bodies(bodies, step);
+    FILE *gnuplot = popen("gnuplot -persistent", "w");
+    if (!gnuplot) {
+        fprintf(stderr, "Could not open gnuplot\n");
+        return 1;
     }
 
-    // Measure end time
-    gettimeofday(&end, NULL);
+    fprintf(gnuplot, "set xrange [-6e12:6e12]\n");
+    fprintf(gnuplot, "set yrange [-6e12:6e12]\n");
+    fprintf(gnuplot, "set size square\n");
 
-    // Calculate elapsed time in seconds
+    for (int step = 0; step < NUM_STEPS; step++) {
+        update_bodies(bodies);
+        if (step % 1000 == 0) {
+            plot_bodies(gnuplot, bodies);
+            
+        }
+    }
+
+    pclose(gnuplot);
+
+    gettimeofday(&end, NULL);
     double time_taken = (end.tv_sec - start.tv_sec) + 
                         (end.tv_usec - start.tv_usec) / 1e6;
 
