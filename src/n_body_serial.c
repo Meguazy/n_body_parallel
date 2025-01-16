@@ -107,7 +107,7 @@ int main() {
 
     for (int step = 0; step < NUM_STEPS; step++) {
         update_bodies(bodies);
-        if (step % 1000 == 0) {
+        if (step % 50 == 0) {
             plot_bodies(gnuplot, bodies);
             
         }
