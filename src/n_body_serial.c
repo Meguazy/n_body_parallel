@@ -5,7 +5,7 @@
 
 #define G 6.67430e-11 // Gravitational constant
 #define DT 1e4 // Time step
-#define NUM_BODIES 28 // Number of celestial bodies
+#define NUM_BODIES 10 // Number of celestial bodies
 #define NUM_STEPS 1000000 // Number of time steps
 
 // Structure to store the position and velocity of a celestial body
@@ -75,7 +75,7 @@ void runge_kutta_step(Body *body, double net_acceleration[3]) {
 }
 
 // Serial implementation of the n-body simulation
-void update_bodies_serial(Body bodies[NUM_BODIES]) {
+void update_bodies(Body bodies[NUM_BODIES]) {
     // Declaring the net acceleration for each body by initializing it to 0
     double net_acceleration[NUM_BODIES][3] = {0};
 
@@ -111,20 +111,29 @@ void print_bodies(Body bodies[NUM_BODIES], int step) {
 }
 
 int main() {
-    // Initialize bodies (example: Sun, Earth, Moon)
+    // Initialize bodies
+    // First column is mass, second column is position (x, y, z), third column is velocity (vel_x, vel_y, vel_z)
+    // Mass is in kg, position is in meters, velocity is in meters per second
     Body bodies[NUM_BODIES] = {
-        {1.989e30, {0, 0, 0}, {0, 0, 0}},           // Sun
+        {1.989e30, {0, 0, 0}, {0, 0, 0}},            // Sun
+        {3.301e23, {5.791e10, 0, 0}, {0, 47400, 0}}, // Mercury
+        {4.867e24, {1.082e11, 0, 0}, {0, 35020, 0}}, // Venus
         {5.972e24, {1.496e11, 0, 0}, {0, 29780, 0}}, // Earth
-        {7.348e22, {1.496e11 + 3.844e8, 0, 0}, {0, 29780 + 1022, 0}} // Moon
+        {6.417e23, {2.279e11, 0, 0}, {0, 24100, 0}}, // Mars
+        {1.899e27, {7.785e11, 0, 0}, {0, 13070, 0}}, // Jupiter
+        {5.685e26, {1.433e12, 0, 0}, {0, 9690, 0}},  // Saturn
+        {8.682e25, {2.872e12, 0, 0}, {0, 6810, 0}},  // Uranus
+        {1.024e26, {4.495e12, 0, 0}, {0, 5430, 0}},  // Neptune
+        {1.461e22, {5.906e12, 0, 0}, {0, 4740, 0}}   // Pluto
     };
 
-    // Measure start time
     struct timeval start, end;
+    // Measure start time
     gettimeofday(&start, NULL);
 
     // Run simulation
     for (int step = 0; step < NUM_STEPS; step++) {
-        update_bodies_serial(bodies);
+        update_bodies(bodies);
         //print_bodies(bodies, step);
     }
 
