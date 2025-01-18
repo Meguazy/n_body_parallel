@@ -109,7 +109,6 @@ int main() {
         update_bodies(bodies);
         if (step % 50 == 0) {
             plot_bodies(gnuplot, bodies);
-            
         }
     }
 
