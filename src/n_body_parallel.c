@@ -176,9 +176,6 @@ int main(int argc, char **argv) {
                    i, sendcounts[i], displs[i]);
         }
     }
-
-    // Broadcast the updated positions to all processes for the next iteration
-    MPI_Bcast(all_bodies, NUM_BODIES, body_type, 0, MPI_COMM_WORLD);    
     
     // Broadcast sendcounts to all processes
     MPI_Scatter(sendcounts, 1, MPI_INT, &local_count, 1, MPI_INT, 0, MPI_COMM_WORLD);
