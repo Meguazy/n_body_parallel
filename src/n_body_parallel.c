@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
         }
     }
     
-    // Broadcast sendcounts to all processes
+    // Scatter sendcounts to all processes
     MPI_Scatter(sendcounts, 1, MPI_INT, &local_count, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
     // Allocate local array used by each process to store bodies
