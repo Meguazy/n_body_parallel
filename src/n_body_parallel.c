@@ -9,7 +9,7 @@
 
 #define G 6.67430e-11
 #define DT 1e4
-#define NUM_BODIES 1000
+#define NUM_BODIES 10000
 #define NUM_STEPS 300
 
 // Define the Body struct
