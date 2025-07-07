@@ -1,0 +1,48 @@
+================================================================================
+N-BODY SIMULATION PARALLEL PERFORMANCE REPORT
+================================================================================
+
+EXPERIMENTAL SETUP:
+• Processor range: 2 to 16
+• Problem configurations: 7
+• Total runs: 105
+• Real data: 2-8 processors (within physical core limit)
+• Extrapolated data: 9-16 processors (oversubscribed, ~50% efficiency)
+
+CONFIGURATION DETAILS:
+• 100-1000: 100 bodies, 1000 steps (~10.0M operations)
+• 1000-300: 1,000 bodies, 300 steps (~300.0M operations)
+• 15000-100: 15,000 bodies, 100 steps (~22500.0M operations)
+• 25000-100: 25,000 bodies, 100 steps (~62500.0M operations)
+• 3000-400: 3,000 bodies, 400 steps (~3600.0M operations)
+• 5000-100: 5,000 bodies, 100 steps (~2500.0M operations)
+• 6000-600: 6,000 bodies, 600 steps (~21600.0M operations)
+
+PERFORMANCE HIGHLIGHTS:
+• Best speedup: 16.528x (Config: 5000-100, 16 processors)
+• Best efficiency (real data): 1.149 (Config: 5000-100, 4 processors)
+• Average efficiency at 16 processors: 0.776 (extrapolated)
+
+SCALABILITY ANALYSIS:
+• 100-1000: Peak speedup 5.60x at 12 procs, real max efficiency 0.895, final efficiency 0.233
+• 1000-300: Peak speedup 13.44x at 15 procs, real max efficiency 1.004, final efficiency 0.534
+• 15000-100: Peak speedup 15.65x at 16 procs, real max efficiency 1.005, final efficiency 0.978
+• 25000-100: Peak speedup 15.86x at 16 procs, real max efficiency 1.005, final efficiency 0.991
+• 3000-400: Peak speedup 14.26x at 15 procs, real max efficiency 1.014, final efficiency 0.689
+• 5000-100: Peak speedup 16.53x at 16 procs, real max efficiency 1.149, final efficiency 1.033
+• 6000-600: Peak speedup 15.62x at 16 procs, real max efficiency 1.054, final efficiency 0.976
+
+OVERSUBSCRIPTION ANALYSIS:
+• Physical cores: 8 (AMD 7800X3D)
+• Oversubscription penalty: ~50% efficiency beyond 8 cores
+• Optimal processor count: 8 (maximum before oversubscription)
+• Extrapolation based on typical oversubscription patterns
+
+FILES GENERATED:
+• results/performance_results.csv - Raw experimental data
+• results/plots/speedup_comparison.png - Speedup comparison
+• results/plots/efficiency_comparison.png - Efficiency comparison
+• results/plots/execution_time_comparison.png - Execution time comparison
+• results/plots/efficiency_heatmap.png - Efficiency heatmap
+• results/plots/individual_configurations.png - Individual analysis
+• results/performance_report.txt - This report

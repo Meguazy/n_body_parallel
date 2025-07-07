@@ -17,19 +17,31 @@ fi
 mkdir -p results
 
 # Add these to your combinations array for stress testing:
+# declare -a combinations=(
+#     "100 1000"    # Communication bound
+#     "200 800"     # Time step overhead  
+#     "500 500"     # Balanced baseline
+#     "1000 300"    # Medium computation
+#     "2000 200"    # Computation bound
+#     "5000 100"    # Highly parallel
+#     "3000 400"    # High computation
+#     "4000 500"    # Very high computation
+#     "10000 200"   # EXTREME: 20B operations (~60-100 seconds)
+#     "8000 400"    # EXTREME: 25.6B operations (~120-180 seconds)
+#     "15000 100"   # EXTREME: 22.5B operations (~100-150 seconds)
+#     "6000 600"    # EXTREME: 21.6B operations (~100-150 seconds)
+#     "25000 100"   # EXTREME: 30B operations (~150-200 seconds)
+#     "30000 100"   # EXTREME: 36B operations (~200-300 seconds)
+# )
+
 declare -a combinations=(
-    "100 1000"    # Communication bound
-    "200 800"     # Time step overhead  
-    "500 500"     # Balanced baseline
-    "1000 300"    # Medium computation
-    "2000 200"    # Computation bound
-    "5000 100"    # Highly parallel
-    "3000 400"    # High computation
-    "4000 500"    # Very high computation
-    "10000 200"   # EXTREME: 20B operations (~60-100 seconds)
-    "8000 400"    # EXTREME: 25.6B operations (~120-180 seconds)
-    "15000 100"   # EXTREME: 22.5B operations (~100-150 seconds)
-    "6000 600"    # EXTREME: 21.6B operations (~100-150 seconds)
+    "100 1000"    # Communication bound - High iterations, minimal computation
+    "1000 300"    # Balanced medium - Good baseline for comparison  
+    "5000 100"    # Computation bound - High computation, low communication overhead
+    "3000 400"    # High both - Substantial computation + significant iterations
+    "6000 600"    # Extreme iterations - Tests time step overhead at scale
+    "15000 100"   # Extreme computation - Maximum bodies, tests memory/cache limits
+    "25000 100"   # Extreme computation - Maximum bodies, tests memory/cache limits
 )
 
 # Initialize CSV file with header

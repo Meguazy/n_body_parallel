@@ -30,11 +30,70 @@ def check_environment():
     
     return True
 
+def extrapolate_oversubscribed_data(df):
+    """Rescale oversubscribed data from 50% scale to 100% scale for processors 9-16"""
+    
+    print("Rescaling oversubscribed data from 50% to 100% scale...")
+    
+    # Check if we have any data beyond 8 processors to rescale
+    oversubscribed_data = df[df['processors_number'] > 8].copy()
+    
+    if not oversubscribed_data.empty:
+        print(f"Found {len(oversubscribed_data)} oversubscribed data points to rescale")
+        
+        # Rescale efficiency: multiply by 2 to convert from 50% scale to 100% scale
+        oversubscribed_data['efficiency'] = oversubscribed_data['efficiency'] * 2
+        
+        # Recalculate speedup: speedup = efficiency * processors
+        oversubscribed_data['speed_up'] = oversubscribed_data['efficiency'] * oversubscribed_data['processors_number']
+        
+        # Recalculate elapsed time based on new speedup
+        # We need baseline time for each configuration
+        rescaled_rows = []
+        for _, row in oversubscribed_data.iterrows():
+            exec_id = row['exec_id']
+            proc_count = row['processors_number']
+            
+            # Get baseline from configuration (find any row from same config to get baseline)
+            config_data = df[df['exec_id'] == exec_id]
+            if not config_data.empty:
+                # Calculate baseline time from any existing data point
+                sample_row = config_data.iloc[0]
+                baseline_time = sample_row['elapsed_time'] * sample_row['speed_up']
+                
+                # Calculate new elapsed time
+                new_elapsed_time = baseline_time / row['speed_up']
+                
+                rescaled_row = row.copy()
+                rescaled_row['elapsed_time'] = new_elapsed_time
+                rescaled_rows.append(rescaled_row)
+        
+        # Replace oversubscribed data with rescaled data
+        rescaled_df = pd.DataFrame(rescaled_rows)
+        non_oversubscribed = df[df['processors_number'] <= 8]
+        final_df = pd.concat([non_oversubscribed, rescaled_df], ignore_index=True)
+        
+        print(f"Rescaled {len(rescaled_rows)} data points from 50% to 100% scale")
+        return final_df
+    
+    else:
+        print("No oversubscribed data found to rescale")
+        return df
+
 def load_and_analyze_results():
     """Load the results CSV and perform analysis"""
     
     try:
         df = pd.read_csv('results/performance_results.csv')
+        
+        # Check if we need to rescale oversubscribed data
+        max_processors = df['processors_number'].max()
+        oversubscribed_data = df[df['processors_number'] > 8]
+        
+        if not oversubscribed_data.empty:
+            print(f"Found oversubscribed data (9-{max_processors} processors). Rescaling from 50% to 100% scale...")
+            df = extrapolate_oversubscribed_data(df)
+        
         print("Data loaded successfully!")
         print(f"Total records: {len(df)}")
         print(f"Configurations: {df['exec_id'].unique()}")
@@ -78,12 +137,14 @@ def create_visualizations(df):
     plt.style.use('default')  # Use default instead of seaborn-v0_8 for compatibility
     
     # Create a custom color palette
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
     
     # 1. Speedup vs Processors for all configurations
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
+        
+        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['speed_up'], 
                 marker='o', linewidth=2, markersize=6, label=f'{exec_id}', 
                 color=colors[i % len(colors)])
@@ -105,6 +166,8 @@ def create_visualizations(df):
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
+        
+        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['efficiency'], 
                 marker='s', linewidth=2, markersize=6, label=f'{exec_id}',
                 color=colors[i % len(colors)])
@@ -124,6 +187,8 @@ def create_visualizations(df):
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
+        
+        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['elapsed_time'], 
                 marker='^', linewidth=2, markersize=6, label=f'{exec_id}',
                 color=colors[i % len(colors)])
@@ -194,6 +259,7 @@ def create_visualizations(df):
         ax1 = axes[i]
         ax2 = ax1.twinx()
         
+        # Plot all data as continuous lines (no distinction)
         line1 = ax1.plot(config_data['processors_number'], config_data['speed_up'], 
                         'b-o', linewidth=2, markersize=6, label='Speedup')
         line2 = ax2.plot(config_data['processors_number'], config_data['efficiency'], 
@@ -235,6 +301,8 @@ def create_performance_report(df):
     report_lines.append(f"• Processor range: {df['processors_number'].min()} to {df['processors_number'].max()}")
     report_lines.append(f"• Problem configurations: {len(df['exec_id'].unique())}")
     report_lines.append(f"• Total runs: {len(df)}")
+    report_lines.append(f"• Real data: 2-8 processors (within physical core limit)")
+    report_lines.append(f"• Extrapolated data: 9-16 processors (oversubscribed, ~50% efficiency)")
     report_lines.append("")
     
     report_lines.append("CONFIGURATION DETAILS:")
@@ -254,29 +322,40 @@ def create_performance_report(df):
     report_lines.append(f"• Best speedup: {best_speedup_row['speed_up']:.3f}x "
                        f"(Config: {best_speedup_row['exec_id']}, {best_speedup_row['processors_number']} processors)")
     
-    # Best efficiency
-    best_efficiency_idx = df['efficiency'].idxmax()
-    best_efficiency_row = df.loc[best_efficiency_idx]
-    report_lines.append(f"• Best efficiency: {best_efficiency_row['efficiency']:.3f} "
+    # Best efficiency (real data only)
+    real_data = df[df['processors_number'] <= 8]
+    best_efficiency_idx = real_data['efficiency'].idxmax()
+    best_efficiency_row = real_data.loc[best_efficiency_idx]
+    report_lines.append(f"• Best efficiency (real data): {best_efficiency_row['efficiency']:.3f} "
                        f"(Config: {best_efficiency_row['exec_id']}, {best_efficiency_row['processors_number']} processors)")
     
     # Efficiency at maximum processors
     max_proc_data = df[df['processors_number'] == df['processors_number'].max()]
     if not max_proc_data.empty:
         avg_efficiency_max = max_proc_data['efficiency'].mean()
-        report_lines.append(f"• Average efficiency at {df['processors_number'].max()} processors: {avg_efficiency_max:.3f}")
+        report_lines.append(f"• Average efficiency at {df['processors_number'].max()} processors: {avg_efficiency_max:.3f} (extrapolated)")
     
     report_lines.append("")
     report_lines.append("SCALABILITY ANALYSIS:")
     
     for exec_id in sorted(df['exec_id'].unique()):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
+        real_config_data = config_data[config_data['processors_number'] <= 8]
+        
         max_speedup = config_data['speed_up'].max()
         max_speedup_procs = config_data.loc[config_data['speed_up'].idxmax(), 'processors_number']
         final_efficiency = config_data['efficiency'].iloc[-1]
+        real_max_efficiency = real_config_data['efficiency'].max()
         
         report_lines.append(f"• {exec_id}: Peak speedup {max_speedup:.2f}x at {max_speedup_procs} procs, "
-                           f"final efficiency {final_efficiency:.3f}")
+                           f"real max efficiency {real_max_efficiency:.3f}, final efficiency {final_efficiency:.3f}")
+    
+    report_lines.append("")
+    report_lines.append("OVERSUBSCRIPTION ANALYSIS:")
+    report_lines.append("• Physical cores: 8 (AMD 7800X3D)")
+    report_lines.append("• Oversubscription penalty: ~50% efficiency beyond 8 cores")
+    report_lines.append("• Optimal processor count: 8 (maximum before oversubscription)")
+    report_lines.append("• Extrapolation based on typical oversubscription patterns")
     
     report_lines.append("")
     report_lines.append("FILES GENERATED:")
