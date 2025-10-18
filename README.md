@@ -1,232 +1,99 @@
 # N-Body Parallel Simulation
 
-A parallel implementation of gravitational N-body simulation using MPI with comprehensive performance analysis.
+A high-performance parallel implementation of gravitational N-body simulation using MPI, with comprehensive performance analysis and visualization tools.
 
-## 📁 Directory Structure
+## Overview
 
-```
-n_body_parallel/
-├── src/
-│   ├── n_body_parallel_param.c    # Main simulation code
-│   └── Makefile                   # Compilation rules
-├── scripts/
-│   ├── run_experiments.sh         # Experiment runner
-│   └── analyze_results.py         # Performance analysis
-├── results/                       # Generated results (created automatically)
-│   ├── performance_results.csv    # Raw experimental data
-│   ├── performance_report.txt     # Analysis summary
-│   ├── baseline_*.txt            # Baseline timing files
-│   └── plots/                    # Visualization files
-├── run_all.sh                    # Main execution script
-└── README.md                     # This file
-```
+This project simulates the gravitational interactions of N bodies in 3D space using Newton's law of universal gravitation. The simulation is parallelized using MPI (Message Passing Interface) and employs a master-slave architecture for efficient load distribution across multiple processors. The implementation is configurable for different problem sizes and includes automated performance benchmarking with detailed analysis and visualization capabilities. The numerical integration uses a 4th-order Runge-Kutta method for accurate trajectory calculations.
 
-## 🚀 Quick Start
+## Mathematical Foundation
+
+### Gravitational Force
+
+The simulation implements Newton's law of universal gravitation between every pair of bodies:
+
+**F = G × m₁ × m₂ / (r² + ε)**
+
+The gravitational constant G is set to 6.67430×10⁻¹¹ m³/(kg·s²), and ε represents a softening parameter (10⁻¹⁰) introduced to prevent singularities when bodies come very close together. For each body, the net acceleration is computed by summing the gravitational effects from all other bodies in the system.
+
+### Numerical Integration
+
+The system uses the **4th-order Runge-Kutta method** (RK4) for time integration. This method provides excellent accuracy while maintaining reasonable computational cost. At each time step, RK4 evaluates the system's derivative at four intermediate points, then combines these evaluations with specific weights (1:2:2:1) to advance both position and velocity. This approach has a local truncation error of O(Δt⁵) and a global error of O(Δt⁴), making it significantly more accurate than simpler methods like Euler integration.
+
+### Computational Complexity
+
+The algorithm has inherent O(N²) complexity for force calculations at each time step, since every body interacts with every other body. The total sequential complexity is O(N² × T), where N is the number of bodies and T is the number of time steps. Parallelization reduces this to approximately O(N²T/P + C), where P is the number of processors and C represents communication overhead from broadcasting and gathering body data.
+
+## Parallel Architecture
+
+The implementation uses a master-slave MPI architecture. The master process (rank 0) initializes the system with random body distributions and coordinates all operations. At each time step, the complete system state is broadcast to all processes. Work is then distributed using MPI_Scatterv, with load balancing that handles remainders when the number of bodies doesn't divide evenly. Each worker process computes forces and updates positions for its assigned bodies, and results are gathered back to the master using MPI_Gatherv. A custom MPI datatype is created for efficient Body struct communication, avoiding the overhead of packing and unpacking individual fields.
+
+## Project Structure
+
+The repository is organized with source code in the `src/` directory, automation scripts in `scripts/`, and experimental results generated in `results/`. The main C implementation is `n_body_parallel_param.c`, which accepts command-line parameters for the number of bodies and time steps. The `run_experiments.sh` script automates running multiple configurations with different processor counts, while `analyze_results.py` processes the raw timing data to generate performance metrics and visualizations.
+
+## Getting Started
 
 ### Prerequisites
-- MPI implementation (OpenMPI, MPICH, etc.)
-- GCC compiler
-- Python 3 with matplotlib, pandas, numpy (for analysis)
 
-### Run Complete Workflow
+You need an MPI implementation (OpenMPI or MPICH), a GCC compiler, and Python 3 with matplotlib, pandas, and numpy for the analysis scripts. On Ubuntu or Debian systems, you can install OpenMPI with `sudo apt-get install libopenmpi-dev`. Python dependencies can be installed using `pip3 install matplotlib pandas numpy seaborn`.
+
+### Quick Start
+
+To run the complete workflow, make the main script executable and execute it:
+
 ```bash
-# Make executable and run everything
 chmod +x run_all.sh
 ./run_all.sh
 ```
 
-### Step-by-Step Execution
+This will compile the simulation, run all configured experiments (which may take 2-4 hours depending on your hardware), and generate comprehensive analysis with visualizations.
+
+### Manual Execution
+
+If you prefer step-by-step control, first compile the simulation:
+
 ```bash
-# 1. Compile the simulation
 cd src
 make compile
 cd ..
+```
 
-# 2. Run experiments (2-4 hours)
+To run a single configuration manually:
+
+```bash
+cd src
+mpirun -np 4 ./n_body_parallel_param 1000 100
+cd ..
+```
+
+This executes the simulation with 4 processes, 1000 bodies, and 100 time steps. For a complete experimental run:
+
+```bash
 ./scripts/run_experiments.sh
-
-# 3. Analyze results
 python3 scripts/analyze_results.py
 ```
 
-## 🧪 Experimental Configurations
+## Experimental Configurations
 
-The framework tests 5 different problem sizes:
+The default experiment suite tests seven different problem configurations, ranging from small communication-bound scenarios (100 bodies, 1000 steps) to large computation-bound problems (25,000 bodies, 100 steps). Each configuration is executed with processor counts from 2 to 16, allowing analysis of scalability characteristics across different problem sizes. The baseline single-processor timing is established first, then used to calculate speedup and parallel efficiency for each multi-processor run.
 
-| Config ID | Bodies | Steps | Operations | Problem Size |
-|-----------|--------|-------|------------|--------------|
-| 500-50    | 500    | 50    | 12.5M      | Small        |
-| 1000-100  | 1000   | 100   | 100M       | Medium-small |
-| 2000-150  | 2000   | 150   | 600M       | Medium       |
-| 5000-200  | 5000   | 200   | 5B         | Large        |
-| 8000-250  | 8000   | 250   | 16B        | Very large   |
+## Performance Analysis
 
-Each configuration is tested with 2-16 MPI processes.
+The analysis script generates several outputs. Raw experimental data is saved in CSV format with columns for configuration ID, number of bodies, time steps, processor count, elapsed time, speedup, and efficiency. A detailed performance report summarizes key metrics including best speedup, efficiency trends, and scalability characteristics for each configuration. Five visualization plots are generated: speedup comparison showing how each configuration scales with processors, efficiency comparison revealing parallel efficiency degradation, execution time trends on a logarithmic scale, an efficiency heatmap across all combinations, and individual configuration analyses with dual-axis plots of speedup and efficiency.
 
-## 📊 Results and Analysis
+## Expected Performance
 
-### Generated Files
+Performance characteristics depend strongly on problem size. Smaller problems tend to be communication-bound, showing modest speedup due to the overhead of broadcasting the full system state at each time step. Larger problems achieve better speedup as the computation-to-communication ratio improves. Typical results show near-linear speedup up to 8 processors, with efficiency around 0.95-1.0 for large problems. Beyond 8 processors on typical hardware, oversubscription effects appear as multiple MPI processes compete for physical cores, reducing efficiency to approximately 50%. The largest configurations (15,000-25,000 bodies) demonstrate the best scalability, sometimes even exhibiting super-linear speedup at low processor counts due to improved cache utilization.
 
-1. **performance_results.csv** - Raw experimental data with columns:
-   - `exec_id`: Configuration identifier (e.g., "1000-100")
-   - `num_bodies`: Number of bodies in simulation
-   - `num_steps`: Number of time steps
-   - `processors_number`: Number of MPI processes used
-   - `elapsed_time`: Wall-clock time in seconds
-   - `speed_up`: Speedup compared to single-process baseline
-   - `efficiency`: Parallel efficiency (speedup/processors)
+## Implementation Notes
 
-2. **performance_report.txt** - Comprehensive analysis including:
-   - Best speedup and efficiency across all configurations
-   - Scalability analysis for each problem size
-   - Performance highlights and bottlenecks
+The simulation initializes bodies with random masses between 10²⁰ and 10³⁰ kg, positions within ±10¹³ meters, and velocities within ±5×10⁴ m/s. These values are chosen to represent astronomical-scale scenarios while maintaining numerical stability. The time step (DT) is set to 10⁴ seconds, appropriate for the spatial and velocity scales involved. The master process uses a fixed random seed (10) to ensure reproducible results across runs. When running experiments, baseline timing files are saved for each configuration, allowing subsequent multi-processor runs to calculate accurate speedup metrics.
 
-3. **Visualization Files** in `results/plots/`:
-   - `speedup_comparison.png` - Speedup vs processors for all configs
-   - `efficiency_comparison.png` - Efficiency analysis
-   - `execution_time_comparison.png` - Runtime comparison
-   - `efficiency_heatmap.png` - Efficiency across all combinations
-   - `individual_configurations.png` - Detailed per-config analysis
+## Troubleshooting
 
-## 🔧 Manual Usage
+If you encounter compilation errors, verify that MPI is installed correctly by running `which mpicc`. For Python dependency issues, ensure all required packages are installed with `pip3 install matplotlib pandas numpy seaborn`. Long runtime is expected for large configurations; a full experimental suite with seven configurations and 15 processor counts can take several hours. You can monitor progress using `top` or `htop` to verify that MPI processes are actively running. For consistent performance measurements, consider using process binding with `mpirun --bind-to core` to reduce variability from process migration.
 
-### Compile and Test
-```bash
-cd src
-make compile
-make test  # Quick test with small parameters
-```
+## License
 
-### Run Single Configuration
-```bash
-cd src
-# Run with 4 processes, 1000 bodies, 100 steps
-mpirun -np 4 ./n_body_parallel_param 1000 100
-```
-
-### Custom Experiments
-```bash
-# Modify the combinations array in scripts/run_experiments.sh
-declare -a combinations=(
-    "100 20"     # Your custom configuration
-    "200 30"     # Another configuration
-)
-```
-
-## 🏗️ Implementation Details
-
-### Algorithm
-- **Physics**: Gravitational N-body simulation using Newton's law
-- **Numerical Integration**: 4th-order Runge-Kutta method
-- **Parallelization**: Master-slave architecture with MPI
-- **Communication**: Broadcast-scatter-gather pattern
-
-### Key Features
-- **Command-line parameters**: Configurable NUM_BODIES and NUM_STEPS
-- **Load balancing**: Optimal work distribution with remainder handling
-- **Custom MPI datatype**: Efficient communication of Body structures
-- **Performance measurement**: Automatic speedup and efficiency calculation
-
-### Computational Complexity
-- **Sequential**: O(N² × T) where N = bodies, T = time steps
-- **Parallel**: O(N²T/P + communication overhead)
-- **Memory**: O(N × P) due to global data dependency
-
-## 📈 Expected Performance Characteristics
-
-Based on the N-body algorithm's properties:
-
-- **Good scaling**: 2-8 processes typically show near-linear speedup
-- **Communication bound**: Efficiency degrades beyond 10-12 processes
-- **Super-linear effects**: Possible due to cache improvements at low process counts
-- **Problem size dependency**: Larger problems scale better due to computation/communication ratio
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-1. **Compilation Errors**
-   ```bash
-   # Ensure MPI is installed
-   which mpicc
-   # Install if missing (Ubuntu/Debian)
-   sudo apt-get install libopenmpi-dev
-   ```
-
-2. **Python Dependencies**
-   ```bash
-   # Install required packages
-   pip3 install matplotlib pandas numpy seaborn
-   ```
-
-3. **Permission Errors**
-   ```bash
-   # Make scripts executable
-   chmod +x run_all.sh scripts/run_experiments.sh
-   ```
-
-4. **Long Runtime**
-   - Large configurations (5000+ bodies) can take hours
-   - Consider reducing problem sizes for quick testing
-   - Monitor with `top` or `htop` to ensure processes are running
-
-### Performance Tips
-
-- **CPU affinity**: Use process binding for consistent results
-  ```bash
-  mpirun --bind-to core -np 4 ./n_body_parallel_param 1000 100
-  ```
-
-- **Node allocation**: For clusters, ensure processes are on same node for small tests
-  ```bash
-  mpirun --map-by node -np 4 ./n_body_parallel_param 1000 100
-  ```
-
-## 📚 Technical Background
-
-### Physics
-The simulation implements Newton's law of universal gravitation:
-```
-F = G × m₁ × m₂ / (r² + ε)
-```
-Where ε is a softening parameter to prevent singularities.
-
-### Parallel Algorithm
-1. **Initialization**: Master generates random body distribution
-2. **Broadcast**: All processes receive complete system state
-3. **Scatter**: Work distributed among processes with load balancing
-4. **Compute**: Each process calculates forces for assigned bodies
-5. **Gather**: Updated bodies collected by master
-6. **Repeat**: Steps 2-5 for each time step
-
-### Architecture
-- **Master Process (rank 0)**: Coordination, I/O, performance measurement
-- **Worker Processes**: Force calculation and numerical integration
-- **Communication**: Global broadcast required due to O(N²) force interactions
-
-## 🤝 Contributing
-
-To extend or modify the simulation:
-
-1. **Add new configurations**: Edit `combinations` array in `run_experiments.sh`
-2. **Modify physics**: Update force calculations in `compute_acceleration()`
-3. **Change integration**: Modify `runge_kutta_step()` function
-4. **Extend analysis**: Add visualizations in `analyze_results.py`
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
-
-## 🏆 Performance Benchmarks
-
-Expected results on typical hardware:
-
-| Configuration | 4 Processes | 8 Processes | 16 Processes |
-|---------------|-------------|-------------|--------------|
-| 500-50        | ~3.2x       | ~5.8x       | ~8.1x        |
-| 1000-100      | ~3.5x       | ~6.2x       | ~9.3x        |
-| 2000-150      | ~3.7x       | ~6.8x       | ~10.1x       |
-| 5000-200      | ~3.8x       | ~7.1x       | ~11.2x       |
-| 8000-250      | ~3.9x       | ~7.3x       | ~12.1x       |
-
-*Actual results depend on hardware, network, and system load.*
+This project is licensed under the Apache License 2.0. See the LICENSE file for complete terms and conditions.
