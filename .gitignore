@@ -52,3 +52,5 @@ Mkfile.old
 dkms.conf
 
 .vscode/nbody_env/
+appunti.c
+appunti.md

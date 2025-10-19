@@ -81,10 +81,12 @@ void update_body_positions(Body *local_bodies, int local_count, Body *all_bodies
     for (int i = 0; i < local_count; i++) {
         double net_acceleration[3] = {0};
         for (int j = 0; j < NUM_BODIES; j++) {
-            double acceleration[3];
-            compute_acceleration(&local_bodies[i], &all_bodies[j], acceleration);
-            for (int k = 0; k < 3; k++) {
-                net_acceleration[k] += acceleration[k];
+            if (&local_bodies[i] != &all_bodies[j]) {
+                double acceleration[3];
+                compute_acceleration(&local_bodies[i], &all_bodies[j], acceleration);
+                for (int k = 0; k < 3; k++) {
+                    net_acceleration[k] += acceleration[k];
+                }
             }
         }
         runge_kutta_step(&local_bodies[i], net_acceleration);
@@ -140,10 +142,7 @@ int main(int argc, char **argv) {
     
     if (rank == 0) {   
         // Initialize the system with random bodies
-        Body *initial_bodies = malloc(NUM_BODIES * sizeof(Body));
-        initialize_random_bodies(initial_bodies, NUM_BODIES, 10);
-        memcpy(all_bodies, initial_bodies, NUM_BODIES * sizeof(Body));
-        free(initial_bodies);
+        initialize_random_bodies(all_bodies, NUM_BODIES, 10);
         
         // Calculate distribution
         int base_count = NUM_BODIES / size;
