@@ -30,11 +30,11 @@ echo "Step 1: Compiling N-Body simulation..."
 cd src
 make compile
 if [ $? -ne 0 ]; then
-    echo "✗ Compilation failed!"
+    echo "Compilation failed!"
     exit 1
 fi
 cd ..
-echo "✓ Compilation successful"
+echo "Compilation successful"
 echo ""
 
 # Step 2: Run experiments
@@ -53,20 +53,20 @@ fi
 echo "Starting experiments..."
 ./scripts/run_experiments.sh
 if [ $? -ne 0 ]; then
-    echo "✗ Experiments failed!"
+    echo "Experiments failed!"
     exit 1
 fi
-echo "✓ Experiments completed"
+echo "Experiments completed"
 echo ""
 
 # Step 3: Analyze results
 echo "Step 3: Analyzing results..."
 python3 scripts/analyze_results.py
 if [ $? -ne 0 ]; then
-    echo "✗ Analysis failed!"
+    echo "Analysis failed!"
     exit 1
 fi
-echo "✓ Analysis completed"
+echo "Analysis completed"
 echo ""
 
 # Summary
@@ -75,9 +75,9 @@ echo "Workflow completed successfully!"
 echo "=============================================="
 echo ""
 echo "Generated files:"
-echo "  📊 results/performance_results.csv"
-echo "  📋 results/performance_report.txt"
-echo "  📈 results/plots/ (5 visualization files)"
+echo "  results/performance_results.csv"
+echo "  results/performance_report.txt"
+echo "  results/plots/ (5 visualization files)"
 echo ""
 echo "Quick preview of results:"
 if [ -f "results/performance_results.csv" ]; then
