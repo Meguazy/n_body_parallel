@@ -45,11 +45,13 @@ void compute_acceleration(Body *body1, Body *body2, double acceleration[3]) {
     double dz = body2->position[2] - body1->position[2];
     
     double distance = sqrt(dx*dx + dy*dy + dz*dz);
-    double magnitude = (G * body2->mass) / (distance * distance + 1e-10);
-
-    acceleration[0] = magnitude * dx / (distance + 1e-10);
-    acceleration[1] = magnitude * dy / (distance + 1e-10);
-    acceleration[2] = magnitude * dz / (distance + 1e-10);
+    double dist_cubed = pow(distance, 3) + 1e-10;
+    
+    double magnitude = G * body2->mass / dist_cubed;
+    
+    acceleration[0] = magnitude * dx;
+    acceleration[1] = magnitude * dy;
+    acceleration[2] = magnitude * dz;
 }
 
 // Perform a single step of the Runge-Kutta integration
