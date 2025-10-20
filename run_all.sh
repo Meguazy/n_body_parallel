@@ -22,7 +22,7 @@ fi
 # Create results directory
 mkdir -p results
 
-echo "✓ Directory structure OK"
+echo "Directory structure OK"
 echo ""
 
 # Step 1: Compile
