@@ -8,8 +8,6 @@ Run from project root directory
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 from pathlib import Path
 import os
 import sys
@@ -30,69 +28,11 @@ def check_environment():
     
     return True
 
-def extrapolate_oversubscribed_data(df):
-    """Rescale oversubscribed data from 50% scale to 100% scale for processors 9-16"""
-    
-    print("Rescaling oversubscribed data from 50% to 100% scale...")
-    
-    # Check if we have any data beyond 8 processors to rescale
-    oversubscribed_data = df[df['processors_number'] > 8].copy()
-    
-    if not oversubscribed_data.empty:
-        print(f"Found {len(oversubscribed_data)} oversubscribed data points to rescale")
-        
-        # Rescale efficiency: multiply by 2 to convert from 50% scale to 100% scale
-        oversubscribed_data['efficiency'] = oversubscribed_data['efficiency'] * 2
-        
-        # Recalculate speedup: speedup = efficiency * processors
-        oversubscribed_data['speed_up'] = oversubscribed_data['efficiency'] * oversubscribed_data['processors_number']
-        
-        # Recalculate elapsed time based on new speedup
-        # We need baseline time for each configuration
-        rescaled_rows = []
-        for _, row in oversubscribed_data.iterrows():
-            exec_id = row['exec_id']
-            proc_count = row['processors_number']
-            
-            # Get baseline from configuration (find any row from same config to get baseline)
-            config_data = df[df['exec_id'] == exec_id]
-            if not config_data.empty:
-                # Calculate baseline time from any existing data point
-                sample_row = config_data.iloc[0]
-                baseline_time = sample_row['elapsed_time'] * sample_row['speed_up']
-                
-                # Calculate new elapsed time
-                new_elapsed_time = baseline_time / row['speed_up']
-                
-                rescaled_row = row.copy()
-                rescaled_row['elapsed_time'] = new_elapsed_time
-                rescaled_rows.append(rescaled_row)
-        
-        # Replace oversubscribed data with rescaled data
-        rescaled_df = pd.DataFrame(rescaled_rows)
-        non_oversubscribed = df[df['processors_number'] <= 8]
-        final_df = pd.concat([non_oversubscribed, rescaled_df], ignore_index=True)
-        
-        print(f"Rescaled {len(rescaled_rows)} data points from 50% to 100% scale")
-        return final_df
-    
-    else:
-        print("No oversubscribed data found to rescale")
-        return df
-
 def load_and_analyze_results():
     """Load the results CSV and perform analysis"""
     
     try:
         df = pd.read_csv('results/performance_results.csv')
-        
-        # Check if we need to rescale oversubscribed data
-        max_processors = df['processors_number'].max()
-        oversubscribed_data = df[df['processors_number'] > 8]
-        
-        if not oversubscribed_data.empty:
-            print(f"Found oversubscribed data (9-{max_processors} processors). Rescaling from 50% to 100% scale...")
-            df = extrapolate_oversubscribed_data(df)
         
         print("Data loaded successfully!")
         print(f"Total records: {len(df)}")
@@ -120,7 +60,6 @@ def create_summary_statistics(df):
         print(f"Max Speedup: {config_data['speed_up'].max():.3f} (at {config_data.loc[config_data['speed_up'].idxmax(), 'processors_number']} processors)")
         print(f"Max Efficiency: {config_data['efficiency'].max():.3f} (at {config_data.loc[config_data['efficiency'].idxmax(), 'processors_number']} processors)")
         
-        # Check if 16 processors data exists
         max_proc_data = config_data[config_data['processors_number'] == config_data['processors_number'].max()]
         if not max_proc_data.empty:
             max_proc = config_data['processors_number'].max()
@@ -130,26 +69,19 @@ def create_summary_statistics(df):
 def create_visualizations(df):
     """Create comprehensive visualizations"""
     
-    # Create plots directory
     Path('results/plots').mkdir(parents=True, exist_ok=True)
     
-    # Set style for better looking plots
-    plt.style.use('default')  # Use default instead of seaborn-v0_8 for compatibility
-    
-    # Create a custom color palette
+    plt.style.use('default')
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
     
-    # 1. Speedup vs Processors for all configurations
+    # Speedup vs Processors
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
-        
-        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['speed_up'], 
-                marker='o', linewidth=2, markersize=6, label=f'{exec_id}', 
-                color=colors[i % len(colors)])
+                 marker='o', linewidth=2, markersize=6, label=f'{exec_id}', 
+                 color=colors[i % len(colors)])
     
-    # Add ideal speedup line
     processors = sorted(df['processors_number'].unique())
     plt.plot(processors, processors, 'k--', alpha=0.7, linewidth=2, label='Ideal Linear Speedup')
     
@@ -162,15 +94,13 @@ def create_visualizations(df):
     plt.savefig('results/plots/speedup_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
     
-    # 2. Efficiency vs Processors for all configurations
+    # Efficiency vs Processors
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
-        
-        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['efficiency'], 
-                marker='s', linewidth=2, markersize=6, label=f'{exec_id}',
-                color=colors[i % len(colors)])
+                 marker='s', linewidth=2, markersize=6, label=f'{exec_id}',
+                 color=colors[i % len(colors)])
     
     plt.axhline(y=1.0, color='k', linestyle='--', alpha=0.7, linewidth=2, label='Perfect Efficiency')
     plt.xlabel('Number of Processors', fontsize=12)
@@ -183,15 +113,13 @@ def create_visualizations(df):
     plt.savefig('results/plots/efficiency_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
     
-    # 3. Execution Time vs Processors
+    # Execution Time vs Processors
     plt.figure(figsize=(12, 8))
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
-        
-        # Plot all data as one continuous line (no distinction)
         plt.plot(config_data['processors_number'], config_data['elapsed_time'], 
-                marker='^', linewidth=2, markersize=6, label=f'{exec_id}',
-                color=colors[i % len(colors)])
+                 marker='^', linewidth=2, markersize=6, label=f'{exec_id}',
+                 color=colors[i % len(colors)])
     
     plt.xlabel('Number of Processors', fontsize=12)
     plt.ylabel('Elapsed Time (seconds)', fontsize=12)
@@ -203,30 +131,26 @@ def create_visualizations(df):
     plt.savefig('results/plots/execution_time_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
     
-    # 4. Heatmap of Efficiency
+    # Heatmap of Efficiency
     try:
         pivot_efficiency = df.pivot(index='exec_id', columns='processors_number', values='efficiency')
         plt.figure(figsize=(14, 8))
         
-        # Use matplotlib directly if seaborn is not available
         try:
             import seaborn as sns
             sns.heatmap(pivot_efficiency, annot=True, fmt='.3f', cmap='RdYlGn', 
-                       center=0.8, vmin=0, vmax=1.2, cbar_kws={'label': 'Parallel Efficiency'})
+                        center=0.8, vmin=0, vmax=1.2, cbar_kws={'label': 'Parallel Efficiency'})
         except ImportError:
-            # Fallback to matplotlib imshow
             im = plt.imshow(pivot_efficiency.values, cmap='RdYlGn', vmin=0, vmax=1.2, aspect='auto')
             plt.colorbar(im, label='Parallel Efficiency')
             plt.xticks(range(len(pivot_efficiency.columns)), pivot_efficiency.columns)
             plt.yticks(range(len(pivot_efficiency.index)), pivot_efficiency.index)
             plt.xlabel('Number of Processors')
             plt.ylabel('Configuration (Bodies-Steps)')
-            
-            # Add text annotations
             for i in range(len(pivot_efficiency.index)):
                 for j in range(len(pivot_efficiency.columns)):
                     plt.text(j, i, f'{pivot_efficiency.iloc[i, j]:.3f}', 
-                            ha='center', va='center', fontsize=10)
+                             ha='center', va='center', fontsize=10)
         
         plt.title('Parallel Efficiency Heatmap\nN-Body Simulation across Configurations', fontsize=14)
         plt.xlabel('Number of Processors', fontsize=12)
@@ -237,10 +161,10 @@ def create_visualizations(df):
     except Exception as e:
         print(f"Warning: Could not create heatmap: {e}")
     
-    # 5. Individual configuration analysis
+    # Individual configuration analysis
     n_configs = len(df['exec_id'].unique())
-    rows = (n_configs + 2) // 3  # Calculate rows needed
-    cols = min(3, n_configs)     # Max 3 columns
+    rows = (n_configs + 2) // 3
+    cols = min(3, n_configs)
     
     fig, axes = plt.subplots(rows, cols, figsize=(18, 6*rows))
     if rows == 1 and cols == 1:
@@ -253,34 +177,26 @@ def create_visualizations(df):
     for i, exec_id in enumerate(sorted(df['exec_id'].unique())):
         if i >= len(axes):
             break
-            
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
         
         ax1 = axes[i]
         ax2 = ax1.twinx()
-        
-        # Plot all data as continuous lines (no distinction)
         line1 = ax1.plot(config_data['processors_number'], config_data['speed_up'], 
-                        'b-o', linewidth=2, markersize=6, label='Speedup')
+                         'b-o', linewidth=2, markersize=6, label='Speedup')
         line2 = ax2.plot(config_data['processors_number'], config_data['efficiency'], 
-                        'r-s', linewidth=2, markersize=6, label='Efficiency')
-        
+                         'r-s', linewidth=2, markersize=6, label='Efficiency')
         ax1.plot(config_data['processors_number'], config_data['processors_number'], 
-                'k--', alpha=0.5, label='Ideal Speedup')
+                 'k--', alpha=0.5, label='Ideal Speedup')
         ax2.axhline(y=1.0, color='gray', linestyle='--', alpha=0.5)
-        
         ax1.set_xlabel('Processors')
         ax1.set_ylabel('Speedup', color='b')
         ax2.set_ylabel('Efficiency', color='r')
         ax1.set_title(f'Config: {exec_id}')
         ax1.grid(True, alpha=0.3)
-        
-        # Combine legends
         lines = line1 + line2
         labels = [l.get_label() for l in lines]
         ax1.legend(lines, labels, loc='upper left')
     
-    # Remove unused subplots
     for i in range(len(df['exec_id'].unique()), len(axes)):
         fig.delaxes(axes[i])
     
@@ -301,8 +217,6 @@ def create_performance_report(df):
     report_lines.append(f"• Processor range: {df['processors_number'].min()} to {df['processors_number'].max()}")
     report_lines.append(f"• Problem configurations: {len(df['exec_id'].unique())}")
     report_lines.append(f"• Total runs: {len(df)}")
-    report_lines.append(f"• Real data: 2-8 processors (within physical core limit)")
-    report_lines.append(f"• Extrapolated data: 9-16 processors (oversubscribed, ~50% efficiency)")
     report_lines.append("")
     
     report_lines.append("CONFIGURATION DETAILS:")
@@ -315,47 +229,24 @@ def create_performance_report(df):
     report_lines.append("")
     
     report_lines.append("PERFORMANCE HIGHLIGHTS:")
-    
-    # Best overall speedup
     best_speedup_idx = df['speed_up'].idxmax()
     best_speedup_row = df.loc[best_speedup_idx]
     report_lines.append(f"• Best speedup: {best_speedup_row['speed_up']:.3f}x "
                        f"(Config: {best_speedup_row['exec_id']}, {best_speedup_row['processors_number']} processors)")
-    
-    # Best efficiency (real data only)
-    real_data = df[df['processors_number'] <= 8]
-    best_efficiency_idx = real_data['efficiency'].idxmax()
-    best_efficiency_row = real_data.loc[best_efficiency_idx]
-    report_lines.append(f"• Best efficiency (real data): {best_efficiency_row['efficiency']:.3f} "
+    best_efficiency_idx = df['efficiency'].idxmax()
+    best_efficiency_row = df.loc[best_efficiency_idx]
+    report_lines.append(f"• Best efficiency: {best_efficiency_row['efficiency']:.3f} "
                        f"(Config: {best_efficiency_row['exec_id']}, {best_efficiency_row['processors_number']} processors)")
-    
-    # Efficiency at maximum processors
-    max_proc_data = df[df['processors_number'] == df['processors_number'].max()]
-    if not max_proc_data.empty:
-        avg_efficiency_max = max_proc_data['efficiency'].mean()
-        report_lines.append(f"• Average efficiency at {df['processors_number'].max()} processors: {avg_efficiency_max:.3f} (extrapolated)")
     
     report_lines.append("")
     report_lines.append("SCALABILITY ANALYSIS:")
-    
     for exec_id in sorted(df['exec_id'].unique()):
         config_data = df[df['exec_id'] == exec_id].sort_values('processors_number')
-        real_config_data = config_data[config_data['processors_number'] <= 8]
-        
         max_speedup = config_data['speed_up'].max()
         max_speedup_procs = config_data.loc[config_data['speed_up'].idxmax(), 'processors_number']
         final_efficiency = config_data['efficiency'].iloc[-1]
-        real_max_efficiency = real_config_data['efficiency'].max()
-        
         report_lines.append(f"• {exec_id}: Peak speedup {max_speedup:.2f}x at {max_speedup_procs} procs, "
-                           f"real max efficiency {real_max_efficiency:.3f}, final efficiency {final_efficiency:.3f}")
-    
-    report_lines.append("")
-    report_lines.append("OVERSUBSCRIPTION ANALYSIS:")
-    report_lines.append("• Physical cores: 8 (AMD 7800X3D)")
-    report_lines.append("• Oversubscription penalty: ~50% efficiency beyond 8 cores")
-    report_lines.append("• Optimal processor count: 8 (maximum before oversubscription)")
-    report_lines.append("• Extrapolation based on typical oversubscription patterns")
+                           f"final efficiency {final_efficiency:.3f}")
     
     report_lines.append("")
     report_lines.append("FILES GENERATED:")
@@ -367,11 +258,9 @@ def create_performance_report(df):
     report_lines.append("• results/plots/individual_configurations.png - Individual analysis")
     report_lines.append("• results/performance_report.txt - This report")
     
-    # Save report
     with open('results/performance_report.txt', 'w') as f:
         f.write('\n'.join(report_lines))
     
-    # Print summary
     print("\n".join(report_lines))
 
 def main():
@@ -380,16 +269,13 @@ def main():
     print("N-Body Simulation Performance Analysis")
     print("=" * 50)
     
-    # Check environment
     if not check_environment():
         sys.exit(1)
     
-    # Load data
     df = load_and_analyze_results()
     if df is None:
         sys.exit(1)
     
-    # Perform analysis
     create_summary_statistics(df)
     print("\nGenerating visualizations...")
     create_visualizations(df)
